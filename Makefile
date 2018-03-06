@@ -14,7 +14,7 @@ endif
 CUR_PWD := $(shell pwd)
 
 # Compilation toolchain
-CC	= gcc
+CC	= $(CUR_PWD)/afl/afl/afl-gcc #gcc
 
 # gcc options
 CFLAGS	:= -Werror
