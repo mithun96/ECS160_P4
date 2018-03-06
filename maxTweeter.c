@@ -11,6 +11,5 @@ int main (void)
 
     printf("%d \n",input);
     */
-
     return 0;
 }
