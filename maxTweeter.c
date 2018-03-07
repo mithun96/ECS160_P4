@@ -89,9 +89,9 @@ void inputError()
 
 void addTweeter(TweetCSV* csvInfo, char* username)
 {
-    /* Add a new Tweeter to a TweetCSV's array */
-    Tweeter* newTweeter;
+    /* Add a new Tweeter to a TweetCSV tweeters array */
 
+    Tweeter* newTweeter;
     /* Dynamically allocate a new Tweeter object */
     newTweeter = (Tweeter*) malloc(sizeof(Tweeter));
     /* Set its count to 1 (first tweet) */
@@ -103,8 +103,7 @@ void addTweeter(TweetCSV* csvInfo, char* username)
 
     /* Store a pointer to the new object in the array */
     csvInfo->tweeters[csvInfo->numTweeters++] = newTweeter;
-
-    /* Check if there are not too many unique tweeters */
+    /* Check if there are too many unique tweeters */
     if(csvInfo->numTweeters > csvInfo->maxTweeters) /* TEST >= TOO!!!! */
         inputError();
 }
@@ -174,17 +173,44 @@ FILE* openCSV(int argc, char* argv[])
     return fp;
 }
 
-/* void findNameCol(TweetCSV* csvInfo)
+void findNameCol(TweetCSV* csvInfo)
 {
-    const char* column;
-    //for (tok = strtok(line, ","); tok && *tok; tok = strtok(NULL, ",\n"))
-    for (tok = strtok(line, ","); ; tok = strtok(NULL, ",\n"))
+    /* Find the name column of a CSV file */
+
+    char* firstRow, *token = " ";
+    int pos = 0, col = 0;
+    const char c[2] = ",";
+
+    /* Allocate space for a word buffer */
+    firstRow = (char*) malloc(sizeof(char) * csvInfo->maxLineLength);
+
+    /* While there is a next token without an ending newline */
+    while(token && token[strlen(token) - 1] != '\n')
     {
-        if (!--num)
-            return tok;
+        /* Get the next chunk of characters from the current position */
+        if(! fgets(firstRow, sizeof(char) * csvInfo->maxLineLength + 1, csvInfo->csvFile))
+            inputError();
+
+        /* Get the next field from the chunk of characters */
+        token = strtok(firstRow, c);
+
+        /* Check if the field is "name" */
+        if(strcmp("\"name\"", token) == 0 || strcmp("name", token) == 0)
+        {
+            csvInfo->nameCol = col;
+            return;
+        }
+
+        /* Otherwise, update position to the end of the field and continue */
+        pos += (strlen(token) + 1);
+        rewind(csvInfo->csvFile);
+        fseek(csvInfo->csvFile, pos, 1);
+        col++;
     }
-    return NULL;
-} */
+
+    /* If not found, error */
+    inputError();
+}
 
 void storeConsts(TweetCSV* csvInfo)
 {
@@ -215,7 +241,7 @@ void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
     checkExtension(csvInfo->filename);
 
     /* Find the names column */
-    /* findNameCol(csvInfo); */
+    findNameCol(csvInfo);
 }
 
 int main (int argc, char* argv[])
@@ -228,10 +254,8 @@ int main (int argc, char* argv[])
 
     /* Map CSV structural information */
     mapCSV(argc, argv, csvInfo);
-    checkTweeter(csvInfo, "Test");
-    checkTweeter(csvInfo, "Test2");
-    checkTweeter(csvInfo, "Test2");
-    printTweeters(csvInfo);
+
+    printCSVInfo(csvInfo);
 
     return 0;
 }
