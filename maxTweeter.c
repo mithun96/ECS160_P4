@@ -94,6 +94,67 @@ void inputError()
     exit(1);
 }
 
+int countQuotes(char* field)
+{
+    /* Count quotes */
+
+    int qtCount = 0, i = 0;
+
+    for(; i < strlen(field); i++ )
+        if(field[i] == '\"')
+            qtCount++;
+
+    return qtCount;
+}
+
+void collectGarbage(TweetCSV* csvInfo)
+{
+    /* Free all allocated memory if safe */
+
+    int i;
+
+    if(csvInfo)
+    {
+        if(csvInfo->tweeters)
+        {
+            for(i = 0; i < csvInfo->numTweeters; i++)
+            {
+                if(csvInfo->tweeters[i])
+                {
+                    if(csvInfo->tweeters[i]->name)
+                        free(csvInfo->tweeters[i]->name);
+
+                    free(csvInfo->tweeters[i]);
+                }
+            }
+
+            free(csvInfo->tweeters);
+        }
+
+        if(csvInfo->csvFile)
+            fclose(csvInfo->csvFile);
+
+        free(csvInfo);
+    }
+}
+
+void storeConsts(TweetCSV* csvInfo)
+{
+    /* Set up TweetCSV object */
+
+    /* Store constants known from HW3 */
+    csvInfo->maxRows = 20001;
+    csvInfo->maxTweeters = 6230;
+
+    /* Set defaults */
+    csvInfo->filePos = 0;
+    csvInfo->fieldPos = 0;
+    csvInfo->nameCol = -1;
+
+    /* Allocate memory for array of Tweeters w/ extra space */
+    csvInfo->tweeters = (Tweeter**) malloc(sizeof(Tweeter*) * 8000);
+}
+
 void addTweeter(TweetCSV* csvInfo, char* username)
 {
     /* Add a new Tweeter to a TweetCSV tweeters array */
@@ -108,15 +169,20 @@ void addTweeter(TweetCSV* csvInfo, char* username)
     /* Store a pointer to the new object in the array */
     csvInfo->tweeters[csvInfo->numTweeters++] = newTweeter;
     /* Check if there are too many unique tweeters */
-    if(csvInfo->numTweeters > csvInfo->maxTweeters) /* TEST >= TOO!!!! */
+    if(csvInfo->numTweeters > csvInfo->maxTweeters)
         inputError();
 }
 
 void checkTweeter(TweetCSV* csvInfo, char* username)
 {
-    /* Check if a Tweeter is in a TweetCSV's array */
+    /* Check if a Tweeter is in a TweetCSV tweeter array */
 
     int i;
+
+    /*  No blank usernames */
+    if(strcmp(username, "") == 0)
+        return;
+
     /* Add Tweeter if the array is empty */
     if(csvInfo->numTweeters == 0)
     {
@@ -126,30 +192,17 @@ void checkTweeter(TweetCSV* csvInfo, char* username)
 
     /* Else, search the array for the user, update count if found */
     for(i = 0; i < csvInfo->numTweeters; i++)
+    {
         if(strcmp(csvInfo->tweeters[i]->name, username) == 0)
         {
             csvInfo->tweeters[i]->tweetCount++;
             return;
         }
+    }
 
-    /* If not found */
+    /* If not found, add */
     if(i == csvInfo->numTweeters)
         addTweeter(csvInfo, username);
-}
-
-FILE* openCSV(int argc, char* argv[])
-{
-    /* Open and return the CSV file if valid */
-
-    FILE* fp;
-
-    /* Check for the correct number of arguments */
-    if(argc != 2) { inputError(); }
-
-    /* Attempt to open the file */
-    if((fp = fopen(argv[1], "r")) == NULL) { inputError(); }
-
-    return fp;
 }
 
 char* getNextChunk(TweetCSV* csvInfo, int throwError)
@@ -167,7 +220,7 @@ char* getNextChunk(TweetCSV* csvInfo, int throwError)
     if(! fgets(chunk, sizeof(char) * 240, csvInfo->csvFile))
     {
         if(throwError == 1)
-            inputError;
+            inputError();
         else
             return NULL;
     }
@@ -179,8 +232,7 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
 {
     /* Get the next field from a chunk */
 
-    char* nextComma;
-    char* field;
+    char* nextComma, *field;
     int diff;
 
     /* Move to the end of the last visited field in the chunk */
@@ -215,27 +267,12 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
     return field;
 }
 
-int countQuotes(char* field)
-{
-    /* Count quotes */
-
-    int qtCount = 0, i = 0;
-
-    for(; i < strlen(field); i++ )
-        if(field[i] == '\"')
-            qtCount++;
-
-    return qtCount;
-}
-
 void getTweeters(TweetCSV* csvInfo)
 {
     /* Get the names of all tweeters */
 
-    int col = 0;
-    int row = 0;
-    char* chunk;
-    char* field = " ";
+    int col = 0, row = 0;
+    char* chunk, *field = " ";
 
     csvInfo->filePos = 0;
     csvInfo->fieldPos = 0;
@@ -246,6 +283,7 @@ void getTweeters(TweetCSV* csvInfo)
         /* Split the chunk into fields */
         while(field = getNextField(chunk, csvInfo))
         {
+            /* If in name column and not in header row */
             if(col == csvInfo->nameCol && row > 0)
                 checkTweeter(csvInfo, field);
 
@@ -253,18 +291,19 @@ void getTweeters(TweetCSV* csvInfo)
             col++;
         }
 
+        /* Update file location, set up to read new row */
         csvInfo->filePos += (strlen(chunk + csvInfo->fieldPos) + 1);
         csvInfo->fieldPos = 0;
         col = 0;
         row++;
 
-       if(row > csvInfo->maxRows)
+        /* Check if maximum exceeded */
+        if(row > csvInfo->maxRows)
             inputError();
 
         if(chunk) free(chunk);
         if(field) free(field);
     }
-
 }
 
 void findNameCol(TweetCSV* csvInfo)
@@ -272,8 +311,7 @@ void findNameCol(TweetCSV* csvInfo)
     /* Find the name column of a CSV file */
 
     int col = 0;
-    char* chunk;
-    char* field = " ";
+    char* chunk, *field = " ";
 
     /* While there are more columns, get a chunk of the header */
     while(chunk = getNextChunk(csvInfo, 1))
@@ -306,22 +344,21 @@ void findNameCol(TweetCSV* csvInfo)
         if(chunk) free(chunk);
         if(field) free(field);
     }
-
 }
 
-void storeConsts(TweetCSV* csvInfo)
+FILE* openCSV(int argc, char* argv[])
 {
-    /* Set up TweetCSV object */
+    /* Open and return the CSV file if valid */
 
-    /* Store constants known from HW3 */
-    csvInfo->maxRows = 20001;
-    csvInfo->maxTweeters = 6230;
-    csvInfo->filePos = 0;
-    csvInfo->fieldPos = 0;
-    csvInfo->nameCol = -1;
+    FILE* fp;
 
-    /* Allocate memory for array of Tweeters w/ extra space */
-    csvInfo->tweeters = (Tweeter**) malloc(sizeof(Tweeter*) * 8000);
+    /* Check for the correct number of arguments */
+    if(argc != 2) { inputError(); }
+
+    /* Attempt to open the file */
+    if((fp = fopen(argv[1], "r")) == NULL) { inputError(); }
+
+    return fp;
 }
 
 void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
@@ -329,7 +366,7 @@ void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
     /* Collect and validate information about the
     *  structure of the CSV file */
 
-    /* Configure the datastructure with known constants */
+    /* Configure the data structure with known constants */
     storeConsts(csvInfo);
 
    /* Open and store the file, as well as its name */
@@ -339,8 +376,42 @@ void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
     /* Find the names column */
     findNameCol(csvInfo);
 
+    /* If not found, error */
     if(csvInfo->nameCol == -1)
         inputError();
+}
+
+Tweeter** printMaxList(TweetCSV* csvInfo)
+{
+    /* Print top 10 tweeters */
+
+    Tweeter* currTweeter;
+    int curr_max = -1, i = 0, listCount = 0;
+
+    /* While less than 10 printed and some users not printed */
+    for(; listCount < 10 && listCount < csvInfo->numTweeters; listCount++, curr_max = -1)
+    {
+        /* For each tweeter, store and mark if highest remaining count */
+        for(i = 0; i < csvInfo->numTweeters; i++)
+        {
+            if(csvInfo->tweeters[i]->tweetCount > curr_max &&
+                csvInfo->tweeters[i]->tweetCount >= 0)
+            {
+                curr_max = csvInfo->tweeters[i]->tweetCount;
+                currTweeter =  csvInfo->tweeters[i];
+            }
+        }
+
+        /* No more */
+        if(! currTweeter)
+            return;
+
+        printf("%s: %d\n", currTweeter->name, currTweeter->tweetCount);
+
+        /* Mark and release */
+        currTweeter->tweetCount = -1;
+        currTweeter = NULL;
+    }
 }
 
 int main (int argc, char* argv[])
@@ -357,7 +428,11 @@ int main (int argc, char* argv[])
     /* Get a count of the number of times each user tweets */
     getTweeters(csvInfo);
 
-    printCSVInfo(csvInfo);
+    /* Print the top 10 tweeters */
+    printMaxList(csvInfo);
+
+    /* Collect garbage */
+    collectGarbage(csvInfo);
 
     return 0;
 }
