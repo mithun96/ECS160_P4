@@ -81,17 +81,17 @@ void inputError()
     exit(1);
 }
 
-int countQuotes(char* field)
+int countChar(char* string, char c)
 {
-    /* Count quotes */
+    /* Count a character */
 
-    int qtCount = 0, i = 0;
+    int count = 0, i = 0;
 
-    for(; i < strlen(field); i++ )
-        if(field[i] == '\"')
-            qtCount++;
+    for(; i < strlen(string); i++ )
+        if(string[i] == c)
+            count++;
 
-    return qtCount;
+    return count;
 }
 
 void collectGarbage(TweetCSV* csvInfo)
@@ -188,19 +188,40 @@ char* getNextChunk(TweetCSV* csvInfo, int throwError)
 {
     /* Get the next chunk of 240 characters from a file */
 
-    char* chunk;
-    chunk = (char*) malloc(sizeof(char) * 240 + 1);
+    int count = 0;
+    char c = ' ';
+    char* chunk, *tempChunk, *addChunk;
+    chunk = (char*) malloc(sizeof(char) * 32767 + 1);
+    memset(chunk, '\0', strlen(chunk));
 
     rewind(csvInfo->csvFile);
     fseek(csvInfo->csvFile, csvInfo->filePos, 1);
 
-    if(! fgets(chunk, sizeof(char) * 240, csvInfo->csvFile))
+    if(! fgets(chunk, sizeof(char) * 32767, csvInfo->csvFile))
     {
         if(throwError == 1)
             inputError();
         else
             return NULL;
     }
+
+    if(countChar(chunk, '\"') % 2 != 0 && chunk[0] == '\"')
+    {
+        rewind(csvInfo->csvFile);
+        fseek(csvInfo->csvFile, csvInfo->filePos + 1, 1);
+
+        while((countChar(chunk, '\"') % 2 != 0 || countChar(chunk, ',') == 0) && ! feof(csvInfo->csvFile))
+        {
+            c = fgetc(csvInfo->csvFile);
+            chunk[count++] = c;
+
+            if(count > 32766)
+                inputError();
+        }
+
+        csvInfo->filePos += count + 1;
+    }
+
 
     return chunk;
 }
@@ -287,12 +308,18 @@ void findNameCol(TweetCSV* csvInfo)
         }
 
         if(chunk[strlen(chunk) + csvInfo->fieldPos - 2] == '\"' ||
-            countQuotes(chunk + csvInfo->fieldPos) == 0)
+            countChar(chunk + csvInfo->fieldPos, '\"') == 0)
         {
             csvInfo->numCols = col + 1;
 
             free(chunk); if(field) free(field);
             return;
+        }
+
+        if(chunk[csvInfo->fieldPos] == '\"')
+        {
+            csvInfo->filePos = csvInfo->fieldPos;
+            continue;
         }
 
         csvInfo->fieldPos += strlen(chunk + csvInfo->fieldPos);
@@ -351,7 +378,6 @@ Tweeter** printMaxList(TweetCSV* csvInfo)
                 currTweeter =  csvInfo->tweeters[i];
             }
         }
-
 
         if(! currTweeter)
             return;
