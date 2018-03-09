@@ -17,8 +17,8 @@ typedef struct Tweeter
 typedef struct TweetCSV
 {
     /* Struct that holds information about the
-    *  passed CSV and its contents. Holds a linked
-    *  list of Tweeter structs. */
+    *  passed CSV and its contents. Holds an array
+    *  of Tweeter structs. */
 
     /* File information */
     /* A pointer to the CSV file */
@@ -33,6 +33,10 @@ typedef struct TweetCSV
     int numTweeters;
     /* Number of columns */
     int numCols;
+    /* Position in the file */
+    int filePos;
+    /* Current field */
+    int fieldPos;
 
     /* Info calculated from HW3 csv per project specs */
     /* Maximum number of rows */
@@ -180,7 +184,7 @@ void getTweeters(TweetCSV* csvInfo)
        count = 0;
 }
 
-void findNameCol(TweetCSV* csvInfo)
+void findNameColbk(TweetCSV* csvInfo)
 {
     /* Find the name column of a CSV file */
 
@@ -229,6 +233,107 @@ void findNameCol(TweetCSV* csvInfo)
     rewind(csvInfo->csvFile);
 }
 
+char* getNextChunk(TweetCSV* csvInfo)
+{
+    /* Get the next chunk of 240 characters from a file */
+    char* chunk;
+    chunk = (char*) malloc(sizeof(char) * 240);
+
+    /* Rewind and set to correct file position */
+    rewind(csvInfo->csvFile);
+    fseek(csvInfo->csvFile, csvInfo->filePos, 1);
+
+    /* Get the chunk */
+    if(! fgets(chunk, sizeof(char) * 240, csvInfo->csvFile))
+        inputError();
+
+    return chunk;
+}
+
+char* getNextField(char* chunk, TweetCSV* csvInfo)
+{
+    /* Get the next field from a chunk */
+
+    char* nextComma;
+    char* field;
+    int diff;
+
+    /* Move to end of last field */
+    chunk = chunk + csvInfo->fieldPos;
+
+    /* Get next comma */
+    nextComma = strchr(chunk, ',');
+
+    /* If last field */
+    if(! nextComma)
+        return NULL;
+
+    /* Else */
+    /* Get length of string between commas */
+    diff = strlen(chunk) - strlen(nextComma);
+
+    /* Copy string between commas */
+    field = (char*) malloc(sizeof(char) * diff + 1);
+    memcpy(field, chunk, diff);
+
+    /* Update the field position */
+    csvInfo->fieldPos += (diff+ 1);
+
+    return field;
+}
+
+int getFieldType(char* field)
+{
+    /* Check if a field ends a row */
+    /* DEBUG THIS */
+    int qtCount = 0, i = 0;
+
+    for(; i < strlen(field); i++ )
+        if(field[i] == '\"')
+            qtCount++;
+
+    if(qtCount % 2 == 0)
+        return 1;
+    else
+        return 0;
+}
+
+int findNameCol(TweetCSV* csvInfo)
+{
+    /* Find the name column of a CSV file */
+
+    int col = 0;
+    char* chunk;
+    char* field = " ";
+
+    /* While there are more columns, get a chunk of the header */
+    while(chunk = getNextChunk(csvInfo))
+    {
+        /* Split the chunk into fields */
+        while(field = getNextField(chunk, csvInfo))
+        {
+            /* Compare the field with "name" */
+            if(strcmp("name", field)  == 0 || strcmp("\"name\"", field) == 0)
+                csvInfo->nameCol = col;
+            else
+                col++;
+        }
+
+        /* If end of row */
+        if(getFieldType(chunk + csvInfo->fieldPos) == 1)
+        {
+            csvInfo->numCols = col + 1;
+            return;
+        }
+
+        /* Move FP to end of last processed field */
+        csvInfo->fieldPos += strlen(chunk + csvInfo->fieldPos);
+        csvInfo->filePos = csvInfo->fieldPos;
+        csvInfo->fieldPos = 0;
+    }
+
+}
+
 void storeConsts(TweetCSV* csvInfo)
 {
     /* Set up TweetCSV object */
@@ -237,6 +342,8 @@ void storeConsts(TweetCSV* csvInfo)
     csvInfo->maxRows = 20000;
     csvInfo->maxLineLength = 183;
     csvInfo->maxTweeters = 6227;
+    csvInfo->filePos = 0;
+    csvInfo->fieldPos = 0;
 
     /* Allocate memory for array of Tweeters w/ extra space */
     csvInfo->tweeters = (Tweeter**) malloc(sizeof(Tweeter*) * 8000);
@@ -266,7 +373,6 @@ int main (int argc, char* argv[])
     /* Dynamically allocate a new object */
     csvInfo = (TweetCSV*) malloc(sizeof(TweetCSV));
 
-    printf("MAP\n");
     /* Map CSV structural information */
     mapCSV(argc, argv, csvInfo);
 
