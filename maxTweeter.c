@@ -157,85 +157,10 @@ FILE* openCSV(int argc, char* argv[])
     return fp;
 }
 
-void getTweeters(TweetCSV* csvInfo)
-{
-
-    int count = 0, col = 0;
-    int pos = 0;
-    char* str1 = "\0", *str2, *firstRow;
-    const char c[2] = ",";
-
-    /* Allocate space for a word buffer */
-    firstRow = (char*) malloc(sizeof(char) * csvInfo->maxLineLength);
-    firstRow = fgets(firstRow, sizeof(char) * csvInfo->maxLineLength + 1, csvInfo->csvFile);
-
-    /* While there is a next token without an ending newline */
-    while(str1)
-    {
-        str1 = strrchr(str1, ',');
-        if(str1){str1++;}
-        pos = strlen(str1);
-        printf("%s\n", str1);
-
-        count++;
-    }
-
-    printf("%d\n", count);
-       count = 0;
-}
-
-void findNameColbk(TweetCSV* csvInfo)
-{
-    /* Find the name column of a CSV file */
-
-    char* firstRow, *token = "\0";
-    int pos = 0, col = 0, flag = 0;
-    const char c[2] = ",";
-
-    /* Allocate space for a wocrd buffer */
-    firstRow = (char*) malloc(sizeof(char) * csvInfo->maxLineLength);
-
-    /* While there is a next token without an ending newline */
-    while(token && token[strlen(token) - 1] != '\n')
-    {
-        /* Get the next chunk of characters from the current position */
-        if(! fgets(firstRow, sizeof(char) * csvInfo->maxLineLength + 1, csvInfo->csvFile))
-            inputError();
-
-        /* Check CSV structure for quotes around cells */
-        if((strcmp(token, "\0") == 0) && firstRow[0] == ',')
-        {
-            csvInfo->numCols = 1; csvInfo->nameCol = 1;
-        }
-
-        /* Get the next field from the chunk of characters */
-        token = strtok(firstRow, c);
-
-        /* Check if the field is "name" */
-        if(strcmp("\"name\"", token) == 0 || strcmp("name", token) == 0)
-        {
-            csvInfo->nameCol += col;
-            flag = 1;
-        }
-
-        /* Otherwise, update position to the end of the field and continue */
-        pos += (strlen(token) + 1);
-        rewind(csvInfo->csvFile);
-        fseek(csvInfo->csvFile, pos, 1);
-        col++;
-    }
-
-    /* If not found, error */
-    if(flag == 0)
-        inputError();
-
-    csvInfo->numCols += col;
-    rewind(csvInfo->csvFile);
-}
-
 char* getNextChunk(TweetCSV* csvInfo)
 {
     /* Get the next chunk of 240 characters from a file */
+
     char* chunk;
     chunk = (char*) malloc(sizeof(char) * 240);
 
@@ -258,7 +183,7 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
     char* field;
     int diff;
 
-    /* Move to end of last field */
+    /* Move to the end of the last visited field in the chunk */
     chunk = chunk + csvInfo->fieldPos;
 
     /* Get next comma */
@@ -272,6 +197,13 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
     /* Get length of string between commas */
     diff = strlen(chunk) - strlen(nextComma);
 
+    /* If comma in field, complete field */
+    if(chunk[0] == '\"' && chunk[diff - 1] != '\"')
+    {
+        nextComma = strchr(nextComma, '\"') + 1;
+        diff = strlen(chunk) - strlen(nextComma);
+    }
+
     /* Copy string between commas */
     field = (char*) malloc(sizeof(char) * diff + 1);
     memcpy(field, chunk, diff);
@@ -282,23 +214,20 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
     return field;
 }
 
-int getFieldType(char* field)
+int countQuotes(char* field)
 {
-    /* Check if a field ends a row */
-    /* DEBUG THIS */
+    /* Count quotes */
+
     int qtCount = 0, i = 0;
 
     for(; i < strlen(field); i++ )
         if(field[i] == '\"')
             qtCount++;
 
-    if(qtCount % 2 == 0)
-        return 1;
-    else
-        return 0;
+    return qtCount;
 }
 
-int findNameCol(TweetCSV* csvInfo)
+void findNameCol(TweetCSV* csvInfo)
 {
     /* Find the name column of a CSV file */
 
@@ -320,7 +249,8 @@ int findNameCol(TweetCSV* csvInfo)
         }
 
         /* If end of row */
-        if(getFieldType(chunk + csvInfo->fieldPos) == 1)
+        if(chunk[strlen(chunk) + csvInfo->fieldPos - 2] == '\"' ||
+            countQuotes(chunk + csvInfo->fieldPos) == 0)
         {
             csvInfo->numCols = col + 1;
             return;
