@@ -41,10 +41,8 @@ typedef struct TweetCSV
     /* Info calculated from HW3 csv per project specs */
     /* Maximum number of rows */
     int maxRows;
-    /* Maximum numver of tweeters */
+    /* Maximum number of tweeters */
     int maxTweeters;
-    /* Maximum line length */
-    int maxLineLength;
 
 } TweetCSV;
 
@@ -62,11 +60,11 @@ void printCSVInfo(TweetCSV* csvInfo)
     }
 
     printf("Max number of rows: %d\n", csvInfo->maxRows);
-    printf("Max line length: %d characters\n", csvInfo->maxLineLength);
     printf("Max number of unique tweeters: %d\n\n", csvInfo->maxTweeters);
     printf("Name column: %d\n", csvInfo->nameCol);
     printf("Total columns: %d\n", csvInfo->numCols);
     printf("Number of recorded users: %d\n", csvInfo->numTweeters);
+    printf("File position %d\n", csvInfo->filePos);
 
     printf("----------- CSV FILE INFO -----------\n");
 }
@@ -105,11 +103,8 @@ void addTweeter(TweetCSV* csvInfo, char* username)
     newTweeter = (Tweeter*) malloc(sizeof(Tweeter));
     /* Set its count to 1 (first tweet) */
     newTweeter->tweetCount = 1;
-    /* Allocate space to store the username in the Tweeter */
-    newTweeter->name = (char*) malloc(sizeof(username));
-    /* Copy the name */
-    strcpy(newTweeter->name, username);
-
+    /* Store the username in the Tweeter */
+    newTweeter->name = username;
     /* Store a pointer to the new object in the array */
     csvInfo->tweeters[csvInfo->numTweeters++] = newTweeter;
     /* Check if there are too many unique tweeters */
@@ -157,12 +152,12 @@ FILE* openCSV(int argc, char* argv[])
     return fp;
 }
 
-char* getNextChunk(TweetCSV* csvInfo)
+char* getNextChunk(TweetCSV* csvInfo, int throwError)
 {
     /* Get the next chunk of 240 characters from a file */
 
     char* chunk;
-    chunk = (char*) malloc(sizeof(char) * 240);
+    chunk = (char*) malloc(sizeof(char) * 240 + 1);
 
     /* Rewind and set to correct file position */
     rewind(csvInfo->csvFile);
@@ -170,7 +165,12 @@ char* getNextChunk(TweetCSV* csvInfo)
 
     /* Get the chunk */
     if(! fgets(chunk, sizeof(char) * 240, csvInfo->csvFile))
-        inputError();
+    {
+        if(throwError == 1)
+            inputError;
+        else
+            return NULL;
+    }
 
     return chunk;
 }
@@ -206,6 +206,7 @@ char* getNextField(char* chunk, TweetCSV* csvInfo)
 
     /* Copy string between commas */
     field = (char*) malloc(sizeof(char) * diff + 1);
+    memset(field,'\0', strlen(field));
     memcpy(field, chunk, diff);
 
     /* Update the field position */
@@ -227,6 +228,45 @@ int countQuotes(char* field)
     return qtCount;
 }
 
+void getTweeters(TweetCSV* csvInfo)
+{
+    /* Get the names of all tweeters */
+
+    int col = 0;
+    int row = 0;
+    char* chunk;
+    char* field = " ";
+
+    csvInfo->filePos = 0;
+    csvInfo->fieldPos = 0;
+
+    /* While there are more columns, get a chunk of the header */
+    while(chunk = getNextChunk(csvInfo, 0))
+    {
+        /* Split the chunk into fields */
+        while(field = getNextField(chunk, csvInfo))
+        {
+            if(col == csvInfo->nameCol && row > 0)
+                checkTweeter(csvInfo, field);
+
+            csvInfo->filePos += strlen(field) + 1;
+            col++;
+        }
+
+        csvInfo->filePos += (strlen(chunk + csvInfo->fieldPos) + 1);
+        csvInfo->fieldPos = 0;
+        col = 0;
+        row++;
+
+       if(row > csvInfo->maxRows)
+            inputError();
+
+        if(chunk) free(chunk);
+        if(field) free(field);
+    }
+
+}
+
 void findNameCol(TweetCSV* csvInfo)
 {
     /* Find the name column of a CSV file */
@@ -236,7 +276,7 @@ void findNameCol(TweetCSV* csvInfo)
     char* field = " ";
 
     /* While there are more columns, get a chunk of the header */
-    while(chunk = getNextChunk(csvInfo))
+    while(chunk = getNextChunk(csvInfo, 1))
     {
         /* Split the chunk into fields */
         while(field = getNextField(chunk, csvInfo))
@@ -253,6 +293,8 @@ void findNameCol(TweetCSV* csvInfo)
             countQuotes(chunk + csvInfo->fieldPos) == 0)
         {
             csvInfo->numCols = col + 1;
+
+            free(chunk); if(field) free(field);
             return;
         }
 
@@ -260,6 +302,9 @@ void findNameCol(TweetCSV* csvInfo)
         csvInfo->fieldPos += strlen(chunk + csvInfo->fieldPos);
         csvInfo->filePos = csvInfo->fieldPos;
         csvInfo->fieldPos = 0;
+
+        if(chunk) free(chunk);
+        if(field) free(field);
     }
 
 }
@@ -269,11 +314,11 @@ void storeConsts(TweetCSV* csvInfo)
     /* Set up TweetCSV object */
 
     /* Store constants known from HW3 */
-    csvInfo->maxRows = 20000;
-    csvInfo->maxLineLength = 183;
-    csvInfo->maxTweeters = 6227;
+    csvInfo->maxRows = 20001;
+    csvInfo->maxTweeters = 6230;
     csvInfo->filePos = 0;
     csvInfo->fieldPos = 0;
+    csvInfo->nameCol = -1;
 
     /* Allocate memory for array of Tweeters w/ extra space */
     csvInfo->tweeters = (Tweeter**) malloc(sizeof(Tweeter*) * 8000);
@@ -293,6 +338,9 @@ void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
 
     /* Find the names column */
     findNameCol(csvInfo);
+
+    if(csvInfo->nameCol == -1)
+        inputError();
 }
 
 int main (int argc, char* argv[])
@@ -307,7 +355,7 @@ int main (int argc, char* argv[])
     mapCSV(argc, argv, csvInfo);
 
     /* Get a count of the number of times each user tweets */
-    /* getTweeters(csvInfo); */
+    getTweeters(csvInfo);
 
     printCSVInfo(csvInfo);
 
