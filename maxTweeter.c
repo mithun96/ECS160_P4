@@ -156,6 +156,7 @@ void addTweeter(TweetCSV* csvInfo, char* username)
         inputError();
 }
 
+
 void checkTweeter(TweetCSV* csvInfo, char* username)
 {
     /* Check if a Tweeter is in a TweetCSV tweeter array */
@@ -183,6 +184,7 @@ void checkTweeter(TweetCSV* csvInfo, char* username)
     if(i == csvInfo->numTweeters)
         addTweeter(csvInfo, username);
 }
+
 
 char* getNextChunk(TweetCSV* csvInfo, int throwError)
 {
@@ -225,6 +227,7 @@ char* getNextChunk(TweetCSV* csvInfo, int throwError)
 
     return chunk;
 }
+
 
 char* getNextField(char* chunk, TweetCSV* csvInfo)
 {
@@ -290,7 +293,7 @@ void getTweeters(TweetCSV* csvInfo)
     }
 }
 
-void findNameCol(TweetCSV* csvInfo)
+void odlFindNameCol(TweetCSV* csvInfo)
 {
     /* Find the name column of a CSV file */
 
@@ -331,12 +334,70 @@ void findNameCol(TweetCSV* csvInfo)
     }
 }
 
+void myParser(TweetCSV* csvInfo)
+{
+    printf("asdf");
+
+    /* Find the name column of a CSV file */
+    char c = ' ';
+    char cc = ' ';
+    int col = 0; /* column number */
+    int count = 0; /* row length */
+    int open = 0;
+    int fieldLen = 0; /* field length */
+    char *field = " ";
+    field = (char*) malloc(sizeof(char) * 32767 + 1);
+
+    c = fgetc(csvInfo->csvFile);
+    printf("HERE %s", c);
+    while(c != NULL){
+        if(strcmp(c, "\"") == 0 && !open){
+            open = 1;
+        }
+        /* open => quotes and command */
+        else if(open && strcmp(c, "\"") == 0){
+            cc = fgetc(csvInfo->csvFile);
+            if(strcmp(cc, ",") == 0){
+                if(strcmp("name", field)  == 0 || strcmp("\"name\"", field) == 0){
+                    csvInfo->nameCol = col;
+                    return;
+                }
+                else
+                    col++;
+            }
+            else if(strcmp(cc, "\n") == 0){
+                if(strcmp("name", field)  == 0 || strcmp("\"name\"", field) == 0){
+                    csvInfo->nameCol = col;
+                    return;
+                }
+                else{
+                    col++;
+                    printf("%s\n", field);
+                    field = " ";
+                    /* clear field and restart*/
+                }
+            }
+            else
+                c = cc;
+                continue;
+        }
+        /* open => quotes and end line */
+        else{
+            field[fieldLen] = c;
+            field[fieldLen + 1] = '\0';   
+            fieldLen++; 
+        }
+
+        c = fgetc(csvInfo->csvFile);
+    }
+}
+
+
 FILE* openCSV(int argc, char* argv[])
 {
     /* Open and return the CSV file if valid */
 
     FILE* fp;
-
     if(argc != 2) { inputError(); }
 
     if((fp = fopen(argv[1], "r")) == NULL) { inputError(); }
@@ -353,14 +414,15 @@ void mapCSV(int argc, char* argv[], TweetCSV* csvInfo)
 
     csvInfo->csvFile = openCSV(argc, argv);
     csvInfo->filename = argv[1];
-
+    /*
     findNameCol(csvInfo);
-
+    
     if(csvInfo->nameCol == -1)
         inputError();
+    */
 }
 
-Tweeter** printMaxList(TweetCSV* csvInfo)
+void printMaxList(TweetCSV* csvInfo)
 {
     /* Print top 10 tweeters */
 
@@ -400,14 +462,16 @@ int main (int argc, char* argv[])
     /* Map CSV structural information */
     mapCSV(argc, argv, csvInfo);
 
-    /* Get a count of the number of times each user tweets */
+    myParser(csvInfo);
+    /* Get a count of the number of times each user tweets 
     getTweeters(csvInfo);
 
-    /* Print the top 10 tweeters */
+    /* Print the top 10 tweeters 
     printMaxList(csvInfo);
 
-    /* Collect garbage */
-    collectGarbage(csvInfo);
+    /* Collect garbage 
+    collectGarbage(csvInfo);  */
 
+    
     return 0;
 }
