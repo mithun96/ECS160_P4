@@ -149,7 +149,8 @@ void addTweeter(TweetCSV* csvInfo, char* username)
     Tweeter* newTweeter;
     newTweeter = (Tweeter*) malloc(sizeof(Tweeter));
     newTweeter->tweetCount = 1;
-    newTweeter->name = username;
+    newTweeter->name = (char *) malloc(sizeof(username));
+    strcpy(newTweeter->name, username);
     csvInfo->tweeters[csvInfo->numTweeters++] = newTweeter;
 
     if(csvInfo->numTweeters > csvInfo->maxTweeters)
@@ -255,7 +256,6 @@ void findNameCol(TweetCSV* csvInfo)
 void getTweeters(TweetCSV* csvInfo)
 {
     /* Get the names of all tweeters */
-    printf("hit getTweeters\n");
 
     int row = 0;
     char c = ' ';
@@ -266,7 +266,7 @@ void getTweeters(TweetCSV* csvInfo)
     int fieldLen = 0; /* field length */
     char *field = " ";
     field = (char*) malloc(sizeof(char) * 32767 + 1);
-    memset(field, '\0', strlen(field));
+    memset(field, '\0', 32768);
 
     c = fgetc(csvInfo->csvFile);
     while(c && !feof(csvInfo->csvFile)){
@@ -280,7 +280,6 @@ void getTweeters(TweetCSV* csvInfo)
                 col = col + 1;
 
                 if(col == csvInfo->nameCol){
-                    printf("name: %s\n", field);
                     checkTweeter(csvInfo, field);
                 }
                 memset(field, '\0', strlen(field));
@@ -317,6 +316,7 @@ void getTweeters(TweetCSV* csvInfo)
         c = fgetc(csvInfo->csvFile);
     }
 
+    if(field){free(field);}
     return;
 }
 
@@ -389,7 +389,6 @@ int main (int argc, char* argv[])
     /* Map CSV structural information */
     mapCSV(argc, argv, csvInfo);
 
-    printf("column number: %d\n", csvInfo->nameCol);
     /* Get a count of the number of times each user tweets */
     getTweeters(csvInfo);
 
