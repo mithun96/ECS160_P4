@@ -167,6 +167,7 @@ void checkTweeter(TweetCSV* csvInfo, char* username)
     if(strcmp(username, "") == 0)
         return;
 
+
     if(csvInfo->numTweeters == 0)
     {
         addTweeter(csvInfo, username);
@@ -345,8 +346,12 @@ void getTweeters(TweetCSV* csvInfo)
 
                 if(col == csvInfo->nameCol){
                     checkTweeter(csvInfo, field);
+                    field = (char*) malloc(sizeof(char) * 32767 + 1);
+
                 }
-                memset(field, '\0', strlen(field));
+                else{
+                    memset(field, '\0', strlen(field));
+                }
                 fieldLen = 0;
             }
             else if(strcmp(&cc, "\n") == 0){
