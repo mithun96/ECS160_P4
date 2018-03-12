@@ -24,8 +24,6 @@ typedef struct TweetCSV
     Tweeter** tweeters;
     int numTweeters;
     int numCols;
-    int filePos;
-    int fieldPos;
     int maxCols;
 
     /* Info calculated from HW3 csv per project specs */
@@ -33,46 +31,6 @@ typedef struct TweetCSV
     int maxTweeters;
 
 } TweetCSV;
-
-/* --------------------------------------------------- DEBUG ----------------------------------------------------- */
-void printCSVInfo(TweetCSV* csvInfo)
-{
-    printf("----------- CSV FILE INFO -----------\n");
-
-    if(csvInfo->csvFile)
-        printf("Valid open file: %s\n\n", csvInfo->filename);
-    else
-    {
-        printf("No open file\n");
-        return;
-    }
-
-    printf("Max number of rows: %d\n", csvInfo->maxRows);
-    printf("Max number of unique tweeters: %d\n\n", csvInfo->maxTweeters);
-    printf("Name column: %d\n", csvInfo->nameCol);
-    printf("Total columns: %d\n", csvInfo->numCols);
-    printf("Number of recorded users: %d\n", csvInfo->numTweeters);
-    printf("File position %d\n", csvInfo->filePos);
-
-    printf("----------- CSV FILE INFO -----------\n");
-}
-
-void printTweeters(TweetCSV* csvInfo)
-{
-    int i;
-    if(csvInfo->numTweeters == 0)
-        printf("NO TWEETER RECORDS\n");
-
-    for(i = 0; i < csvInfo->numTweeters; i++)
-    {
-        printf("----------- TWEETER RECORD -----------\n");
-        printf("Name: %s\n",  csvInfo->tweeters[i]->name);
-        printf("Count: %d\n",  csvInfo->tweeters[i]->tweetCount);
-        printf("----------- TWEETER RECORD -----------\n");
-    }
-}
-
-/* --------------------------------------------------- DEBUG ----------------------------------------------------- */
 
 void inputError()
 {
@@ -135,8 +93,6 @@ void storeConsts(TweetCSV* csvInfo)
     csvInfo->maxTweeters = 6230;
 
     /* Set defaults */
-    csvInfo->filePos = 0;
-    csvInfo->fieldPos = 0;
     csvInfo->nameCol = -1;
 
     /* Allocate memory for array of Tweeters w/ extra space */
@@ -188,19 +144,20 @@ void checkTweeter(TweetCSV* csvInfo, char* username)
 
 void findNameCol(TweetCSV* csvInfo)
 {
-
     /* Find the name column of a CSV file */
-    char c = ' ';
-    char cc = ' ';
+
+    char c = ' '; /* parsing chararacter */
+    char cc = ' '; /* forward buffer character */
     int col = 0; /* column number */
     int count = 0; /* row length */
-    int open = 0;
+    int open = 0; /* boolean to check if quotes are open/close */
     int fieldLen = 0; /* field length */
-    char *field = " ";
+    char *field = " "; /* string of field text */
     field = (char*) malloc(sizeof(char) * 3767 + 1);
 
     c = fgetc(csvInfo->csvFile);
     if(strcmp(&c, "\"") == 0){
+        /* If there are quotes around the text fields */
 
         while(c && !feof(csvInfo->csvFile)){
                 
@@ -252,6 +209,8 @@ void findNameCol(TweetCSV* csvInfo)
         }
     }
     else{
+        /* If there are NO quotes around the text fields */
+
         while(c && !feof(csvInfo->csvFile)){
 
             if(strcmp(&c, ",") == 0){
@@ -291,14 +250,14 @@ void getTweeters(TweetCSV* csvInfo)
 {
     /* Get the names of all tweeters */
 
-    int row = 1;
-    char c = ' ';
-    char cc = ' ';
+    int row = 1; /* Number of rows in csv file */
+    char c = ' '; /* parsing character */
+    char cc = ' '; /* forward buffer character */
     int col = 0; /* column number */
     int count = 0; /* row length */
-    int open = 0;
+    int open = 0; /* boolean to check if quotes are open/close */
     int fieldLen = 0; /* field length */
-    char *field = " ";
+    char *field = " "; /* string of field text */
     field = (char*) malloc(sizeof(char) * 3767 + 1);
     memset(field, '\0', 3768);
 
@@ -308,6 +267,7 @@ void getTweeters(TweetCSV* csvInfo)
     
     c = fgetc(csvInfo->csvFile);
     if(strcmp(&c, "\"") == 0){
+        /* If there are quotes around the text fields */
 
         while(c && !feof(csvInfo->csvFile)){
             
@@ -366,6 +326,8 @@ void getTweeters(TweetCSV* csvInfo)
         }
     }
     else{
+         /* If there are NO quotes around the text fields */
+
         while(c && !feof(csvInfo->csvFile)){
 
             if(strcmp(&c, ",") == 0){
@@ -487,7 +449,6 @@ int main (int argc, char* argv[])
 
     /*Collect garbage */
     collectGarbage(csvInfo);  
-    
     
     return 0;
 }
