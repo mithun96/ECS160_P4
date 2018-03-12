@@ -171,7 +171,6 @@ void findNameCol(TweetCSV* csvInfo)
                     if(strcmp("name", field)  == 0 || strcmp("\"name\"", field) == 0){
                         csvInfo->nameCol = col;
                     }
-                    
                     memset(field, '\0', strlen(field));
                     fieldLen = 0;
                     
@@ -192,9 +191,10 @@ void findNameCol(TweetCSV* csvInfo)
                     if(field){free(field);}
                     return;
                 }
-                else
+                else{
                     c = cc;
                     continue;
+                }
             }
             else if(strcmp(&c, "\"") == 0 && !open){
                 open = 1;
@@ -310,9 +310,10 @@ void getTweeters(TweetCSV* csvInfo)
                     col = 0;
 
                 }
-                else
+                else{
                     c = cc;
                     continue;
+                }
             }
             else if(strcmp(&c, "\"") == 0 && !open){
                 open = 1;

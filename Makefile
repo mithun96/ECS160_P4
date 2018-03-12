@@ -14,11 +14,10 @@ endif
 CUR_PWD := $(shell pwd)
 
 # Compilation toolchain
-CC	= $(CUR_PWD)/afl/afl/afl-gcc #gcc
+CC      = afl-clang #clang
 
-# gcc options
-CFLAGS	:= -Werror
-CFLAGS  += -ansi
+# options
+CFLAGS  := -ansi
 CFLAGS  += -pedantic
 CFLAGS	+= -g
 
@@ -38,3 +37,6 @@ $(program): maxTweeter.o
 clean:
 	@echo "CLEAN	$(CUR_PWD)"
 	$(Q)rm -f $(program) *.o
+
+
+
