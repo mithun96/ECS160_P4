@@ -273,7 +273,12 @@ void getTweeters(TweetCSV* csvInfo)
     field = (char*) malloc(sizeof(char) * 32767 + 1);
     memset(field, '\0', 32768);
 
+    if(feof(csvInfo->csvFile)){
+        inputError();
+    }
+    
     c = fgetc(csvInfo->csvFile);
+
     while(c && !feof(csvInfo->csvFile)){
             
         /* open => quotes and command */
@@ -310,7 +315,6 @@ void getTweeters(TweetCSV* csvInfo)
                 fieldLen = 0;
                 col = 0;
 
-        
             }
             else
                 c = cc;
@@ -323,8 +327,6 @@ void getTweeters(TweetCSV* csvInfo)
             field[fieldLen] = c;            
             fieldLen++; 
         }
-
-       
 
         c = fgetc(csvInfo->csvFile);
     }
